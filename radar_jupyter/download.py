@@ -10,14 +10,15 @@ from .client import (
     RadarMetadataType,
     _get_filename_from_content_disposition_header,
     _get_metadata_export_url,
+    resolve_dataset_id,
 )
 
 
 def _download_file(
-    radar_id: str,
+    identifier: str,
     client: RadarApiClient,
     chunk_size: int = 1024 * 1024,
-    timeout: Optional[float] = 30,
+    timeout: Optional[float] = 30.0,
 ) -> Path:
     """
     Download a dataset TAR archive from RADAR, printing progress to stdout.
@@ -25,12 +26,13 @@ def _download_file(
     The download URL is resolved via the RADAR API, which handles redirects to
     the actual storage location.
 
-    :param radar_id: The RADAR dataset ID.
-    :param client: An authenticated RadarApiClient instance.
+    :param identifier: Dataset ID, RADAR ID (``RADAR/<id>``), or DOI.
+    :param client: A RadarApiClient instance.
     :param chunk_size: Number of bytes to read per chunk.
     :param timeout: Stream request timeout in seconds. Use None to disable.
     :return: Path to the downloaded TAR file.
     """
+    radar_id = resolve_dataset_id(identifier)
     download_dir = Path(DOWNLOAD_DIR)
     existing = next(download_dir.glob(f"*{radar_id}*"), None)
     if existing is not None:
@@ -80,7 +82,7 @@ def _download_file(
 
 
 def download_radar_metadata(
-    radar_id: str,
+    identifier: str,
     metadata_type: RadarMetadataType = RadarMetadataType.JSON,
     chunk_size: int = 1024 * 1024,
     timeout: Optional[float] = 30,
@@ -89,15 +91,16 @@ def download_radar_metadata(
     Download RADAR dataset metadata in a specific format and save it to a file.
 
     Use this when you need the raw metadata file (JSON-LD, RADAR XML, etc.).
-    For plain JSON metadata, prefer ``RadarApiClient.get_dataset()`` instead —
+    For plain JSON metadata, prefer ``RadarApiClient.get_dataset_metadata()`` instead —
     it returns the data directly without writing a file.
 
-    :param radar_id: The RADAR dataset ID.
+    :param identifier: Dataset ID, RADAR ID (``RADAR/<id>``), or DOI.
     :param metadata_type: The schema type of the metadata to download.
     :param chunk_size: Number of bytes to read per chunk.
     :param timeout: Request timeout in seconds. Use None to disable.
     :return: Path to the downloaded metadata file.
     """
+    radar_id = resolve_dataset_id(identifier)
     url = _get_metadata_export_url(radar_id, metadata_type)
     output_path = Path(DOWNLOAD_DIR)
 

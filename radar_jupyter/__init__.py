@@ -1,7 +1,13 @@
 import sys
 from pathlib import Path
 
-from .client import DOWNLOAD_DIR, EXTRACTION_DIR, RadarApiClient, RadarMetadataType
+from .client import (
+    DOWNLOAD_DIR,
+    EXTRACTION_DIR,
+    RadarApiClient,
+    RadarMetadataType,
+    resolve_dataset_id,
+)
 from .download import _download_file, download_radar_metadata
 from .extract import _safe_extract_tar_with_progress
 from .verify import verify_tar_checksum
@@ -11,28 +17,37 @@ __all__ = [
     "RadarMetadataType",
     "download_and_extract",
     "download_radar_metadata",
+    "resolve_dataset_id",
 ]
 
 
-def download_and_extract(radar_id: str, client: RadarApiClient | None = None) -> Path:
+def download_and_extract(
+    identifier: str, client: RadarApiClient | None = None
+) -> Path:
     """
-    Download, verify, and extract a RADAR dataset by its dataset ID.
+    Download, verify, and extract a RADAR dataset.
 
     Dataset metadata is fetched from the RADAR API and the downloaded TAR archive
     is verified against the recorded MD5 checksum before extraction proceeds.
+    If the dataset was previously downloaded and extracted, the cached result is
+    returned after re-verifying the TAR checksum (if the TAR file is still present).
 
-    :param radar_id: The RADAR dataset ID.
+    :param identifier: Dataset ID, RADAR ID (``RADAR/<id>``), or DOI.
     :param client: Optional ``RadarApiClient`` instance. A default client is created if omitted.
     :return: Path to the extracted dataset directory.
-    :raises ValueError: If checksum verification fails.
+    :raises ValueError: If the identifier is invalid or checksum verification fails.
 
     Example::
 
         from radar_jupyter import download_and_extract
-        data_path = download_and_extract("your-radar-id")
+        data_path = download_and_extract("https://doi.org/10.2222/your-dataset-id")
+        data_path = download_and_extract("RADAR/your-dataset-id")
+        data_path = download_and_extract("your-dataset-id")
     """
     if client is None:
         client = RadarApiClient()
+
+    radar_id = resolve_dataset_id(identifier)
 
     extracted_dir = (Path(EXTRACTION_DIR) / radar_id).resolve()
     if extracted_dir.exists():

@@ -17,6 +17,49 @@ EXTRACTION_DIR = getenv("RADAR_EXTRACTION_DIR", "extracted")
 RADAR_API_URL = getenv("RADAR_API_URL", "https://www.radar-service.eu/radar")
 
 
+_RADAR_ID_PATTERN = re.compile(r"^RADAR/(.+)$", re.IGNORECASE)
+_DOI_PATTERN = re.compile(
+    r"^(?:https?://(?:dx\.)?doi\.org/|doi:)?(10\.\d{4,}/(.+))$",
+    re.IGNORECASE,
+)
+
+
+def resolve_dataset_id(identifier: str) -> str:
+    """
+    Extract the plain RADAR dataset ID from any supported identifier format.
+
+    Accepted formats:
+
+    - Plain dataset ID: ``d1a2b3c4-...``
+    - RADAR ID: ``RADAR/d1a2b3c4-...``
+    - Bare DOI: ``10.2222/d1a2b3c4-...``
+    - DOI URL: ``https://doi.org/10.2222/d1a2b3c4-...``
+
+    :param identifier: A dataset identifier in any of the formats above.
+    :return: The plain dataset ID.
+    :raises ValueError: If the identifier is empty.
+
+    Example::
+
+        resolve_dataset_id("https://doi.org/10.2222/abc123")  # → "abc123"
+        resolve_dataset_id("RADAR/abc123")                    # → "abc123"
+        resolve_dataset_id("abc123")                          # → "abc123"
+    """
+    identifier = identifier.strip()
+    if not identifier:
+        raise ValueError("Identifier must not be empty.")
+
+    m = _RADAR_ID_PATTERN.match(identifier)
+    if m:
+        return m.group(1)
+
+    m = _DOI_PATTERN.match(identifier)
+    if m:
+        return m.group(2)
+
+    return identifier
+
+
 def _get_metadata_export_url(
     radar_id: str, metadata_type: RadarMetadataType = RadarMetadataType.JSON
 ) -> str:
@@ -61,19 +104,6 @@ class RadarApiClient:
         }
         resp = self._session.get(
             f"{self.base_url}/api/datasets", params=params, timeout=self.timeout
-        )
-        resp.raise_for_status()
-        return resp.json()
-
-    def get_dataset(self, dataset_id: str) -> dict:
-        """
-        Fetch a dataset record from the RADAR REST API.
-
-        :param dataset_id: The RADAR dataset ID.
-        :return: Dataset record dict.
-        """
-        resp = self._session.get(
-            f"{self.base_url}/api/datasets/{dataset_id}", timeout=self.timeout
         )
         resp.raise_for_status()
         return resp.json()

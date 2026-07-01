@@ -1,0 +1,13 @@
+[project]
+name = "radar-jupyter"
+version = "0.1.0"
+description = "Python library for interacting with the RADAR research data repository"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.34.2",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["radar_jupyter*"]

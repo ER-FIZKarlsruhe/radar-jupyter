@@ -5,7 +5,9 @@ description = "Python library for interacting with the RADAR research data repos
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "matplotlib<3.11.0",
     "requests>=2.34.2",
+    "sparqlwrapper>=2.0.0",
 ]
 
 [project.optional-dependencies]

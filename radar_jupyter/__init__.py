@@ -13,13 +13,31 @@ from .client import (
 )
 from .download import _download_file, download_radar_metadata
 from .extract import _safe_extract_tar_with_progress
+from .knowledge_graph import (
+    Dataset,
+    list_datasets_by_author,
+    list_datasets_by_institution,
+    list_datasets_by_year,
+)
+from .stats import (
+    YearAccessStats,
+    aggregate_access_download_stats,
+    plot_access_download_ratio,
+)
 from .verify import verify_tar_checksum
 
 __all__ = [
+    "Dataset",
     "RadarApiClient",
     "RadarMetadataType",
+    "YearAccessStats",
+    "aggregate_access_download_stats",
     "download_and_extract",
     "download_radar_metadata",
+    "list_datasets_by_author",
+    "list_datasets_by_institution",
+    "list_datasets_by_year",
+    "plot_access_download_ratio",
 ]
 
 
@@ -33,6 +51,7 @@ def download_and_extract(
     is verified against the recorded MD5 checksum before extraction proceeds.
     If the dataset was previously downloaded and extracted, the cached result is
     returned after re-verifying the TAR checksum (if the TAR file is still present).
+    If a previous download was interrupted, it is resumed from where it stopped.
 
     :param identifier: Dataset ID, RADAR ID (``RADAR/<id>``), or DOI.
     :param client: Optional ``RadarApiClient`` instance. A default client is created if omitted.

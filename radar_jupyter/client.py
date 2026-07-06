@@ -16,6 +16,7 @@ DOWNLOAD_DIR = getenv("RADAR_DOWNLOAD_DIR", "downloads")
 EXTRACTION_DIR = getenv("RADAR_EXTRACTION_DIR", "extracted")
 RADAR_API_URL = getenv("RADAR_API_URL", "https://www.radar-service.eu/radar")
 DOI_RESOLVER_URL = getenv("DOI_RESOLVER_URL", "https://doi.org")
+RADAR_SPARQL_URL = getenv("RADAR_SPARQL_URL", "https://radar-service.eu/sparql")
 
 # Hosts whose downloads can be checksum-verified via the RADAR metadata API.
 _VERIFIABLE_DOWNLOAD_HOSTS = ("radar-service.eu", "radar.kit.edu")

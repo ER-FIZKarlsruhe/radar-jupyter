@@ -4,9 +4,39 @@ certifi==2026.6.17
     # via requests
 charset-normalizer==3.4.7
     # via requests
+contourpy==1.3.3
+    # via matplotlib
+cycler==0.12.1
+    # via matplotlib
+fonttools==4.63.0
+    # via matplotlib
 idna==3.18
     # via requests
+kiwisolver==1.5.0
+    # via matplotlib
+matplotlib==3.10.9
+    # via radar-jupyter
+numpy==2.5.1
+    # via
+    #   contourpy
+    #   matplotlib
+packaging==26.2
+    # via matplotlib
+pillow==12.3.0
+    # via matplotlib
+pyparsing==3.3.2
+    # via
+    #   matplotlib
+    #   rdflib
+python-dateutil==2.9.0.post0
+    # via matplotlib
+rdflib==7.6.0
+    # via sparqlwrapper
 requests==2.34.2
+    # via radar-jupyter
+six==1.17.0
+    # via python-dateutil
+sparqlwrapper==2.0.0
     # via radar-jupyter
 urllib3==2.7.0
     # via requests

@@ -19,12 +19,21 @@ from radar_jupyter.stats import (
     YearAccessStats,
     _statistics_base_url,
     aggregate_access_download_stats,
+    clear_stats_cache,
     plot_access_download_ratio,
 )
 
 
 def _dataset(uri, date="2024-01-01", name="Some data"):
     return Dataset(id=uri, name=name, date_published=date)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_stats_cache():
+    """Keep the module-level statistics cache from leaking between tests."""
+    clear_stats_cache()
+    yield
+    clear_stats_cache()
 
 
 # --------------------------------------------------------------------------- #
@@ -138,6 +147,99 @@ def test_reuses_one_client_per_host():
         "https://radar.kit.edu/radar",
         "https://radar4chem.radar-service.eu/radar",
     }
+
+
+# --------------------------------------------------------------------------- #
+# Statistics caching
+# --------------------------------------------------------------------------- #
+
+def test_second_aggregation_uses_cache_and_skips_requests():
+    datasets = [
+        _dataset("https://radar.kit.edu/id/aaa"),
+        _dataset("https://radar4chem.radar-service.eu/id/bbb"),
+    ]
+    stats_by_id = {
+        "aaa": {"totalAccess": 100, "totalDownloads": 3},
+        "bbb": {"totalAccess": 40, "totalDownloads": 7},
+    }
+
+    with patch(
+        "radar_jupyter.stats.list_datasets_by_year", return_value=datasets
+    ), patch(
+        "radar_jupyter.stats.RadarApiClient.get_statistics",
+        side_effect=lambda rid: stats_by_id[rid],
+    ) as get_stats:
+        first = aggregate_access_download_stats(2024, progress=False)
+        second = aggregate_access_download_stats(2024, progress=False)
+
+    assert first == second
+    # Statistics fetched once per dataset on the first call; served from cache
+    # on the second, so no additional HTTP calls.
+    assert get_stats.call_count == 2
+
+
+def test_use_cache_false_always_refetches():
+    datasets = [_dataset("https://radar.kit.edu/id/aaa")]
+
+    with patch(
+        "radar_jupyter.stats.list_datasets_by_year", return_value=datasets
+    ), patch(
+        "radar_jupyter.stats.RadarApiClient.get_statistics",
+        return_value={"totalAccess": 1, "totalDownloads": 1},
+    ) as get_stats:
+        aggregate_access_download_stats(2024, progress=False, use_cache=False)
+        aggregate_access_download_stats(2024, progress=False, use_cache=False)
+
+    assert get_stats.call_count == 2
+
+
+def test_clear_stats_cache_forces_refetch():
+    datasets = [_dataset("https://radar.kit.edu/id/aaa")]
+
+    with patch(
+        "radar_jupyter.stats.list_datasets_by_year", return_value=datasets
+    ), patch(
+        "radar_jupyter.stats.RadarApiClient.get_statistics",
+        return_value={"totalAccess": 1, "totalDownloads": 1},
+    ) as get_stats:
+        aggregate_access_download_stats(2024, progress=False)
+        clear_stats_cache()
+        aggregate_access_download_stats(2024, progress=False)
+
+    assert get_stats.call_count == 2
+
+
+def test_transient_errors_are_not_cached_but_http_errors_are():
+    datasets = [
+        _dataset("https://radar.kit.edu/id/flaky"),
+        _dataset("https://radar.kit.edu/id/missing"),
+    ]
+    calls = {"flaky": 0, "missing": 0}
+
+    def _get(rid):
+        calls[rid] += 1
+        if rid == "flaky":
+            # Times out the first time, succeeds the second.
+            if calls["flaky"] == 1:
+                raise requests.Timeout("slow host")
+            return {"totalAccess": 5, "totalDownloads": 1}
+        raise requests.HTTPError("404")  # stable "no statistics"
+
+    with patch(
+        "radar_jupyter.stats.list_datasets_by_year", return_value=datasets
+    ), patch(
+        "radar_jupyter.stats.RadarApiClient.get_statistics", side_effect=_get
+    ):
+        first = aggregate_access_download_stats(2024, progress=False)
+        second = aggregate_access_download_stats(2024, progress=False)
+
+    # First pass: flaky timed out (skipped, not cached), missing 404'd (cached).
+    assert first.counted_datasets == 0
+    # Second pass: flaky is retried and now succeeds; missing stays cached (no
+    # second request), so exactly one more call to the flaky host was made.
+    assert second.counted_datasets == 1
+    assert second.total_access == 5
+    assert calls == {"flaky": 2, "missing": 1}
 
 
 # --------------------------------------------------------------------------- #

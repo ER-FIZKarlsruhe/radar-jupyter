@@ -22,6 +22,7 @@ from .knowledge_graph import (
 from .stats import (
     YearAccessStats,
     aggregate_access_download_stats,
+    clear_stats_cache,
     plot_access_download_ratio,
 )
 from .verify import verify_tar_checksum
@@ -32,6 +33,7 @@ __all__ = [
     "RadarMetadataType",
     "YearAccessStats",
     "aggregate_access_download_stats",
+    "clear_stats_cache",
     "download_and_extract",
     "download_radar_metadata",
     "list_datasets_by_author",

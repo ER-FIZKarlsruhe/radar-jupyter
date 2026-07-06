@@ -6,7 +6,10 @@ from .client import (
     EXTRACTION_DIR,
     RadarApiClient,
     RadarMetadataType,
+    is_doi,
+    is_verifiable_download_host,
     resolve_dataset_id,
+    resolve_doi_download_url,
 )
 from .download import _download_file, download_radar_metadata
 from .extract import _safe_extract_tar_with_progress
@@ -17,7 +20,6 @@ __all__ = [
     "RadarMetadataType",
     "download_and_extract",
     "download_radar_metadata",
-    "resolve_dataset_id",
 ]
 
 
@@ -49,12 +51,27 @@ def download_and_extract(
 
     radar_id = resolve_dataset_id(identifier)
 
+    # For a DOI, resolve the TAR download URL from its ``rel="item"`` Link header.
+    # The checksum can only be verified for downloads served by a known RADAR host.
+    download_url: str | None = None
+    verify_checksum = True
+    if is_doi(identifier):
+        download_url = resolve_doi_download_url(identifier)
+        verify_checksum = is_verifiable_download_host(download_url)
+        if not verify_checksum:
+            sys.stdout.write(
+                "Warning: the download is not served by a known RADAR host; "
+                "the file hash cannot be verified.\n"
+            )
+            sys.stdout.flush()
+
     extracted_dir = (Path(EXTRACTION_DIR) / radar_id).resolve()
     if extracted_dir.exists():
-        tar_path = next(Path(DOWNLOAD_DIR).glob(f"*{radar_id}*"), None)
-        if tar_path is not None:
-            metadata = client.get_dataset_metadata(radar_id)
-            verify_tar_checksum(tar_path, metadata)
+        if verify_checksum:
+            tar_path = next(Path(DOWNLOAD_DIR).glob(f"*{radar_id}*"), None)
+            if tar_path is not None:
+                metadata = client.get_dataset_metadata(radar_id)
+                verify_tar_checksum(tar_path, metadata)
 
         subdirs = [p for p in extracted_dir.iterdir() if p.is_dir()]
         cached_path = subdirs[0] if len(subdirs) == 1 else extracted_dir
@@ -62,7 +79,8 @@ def download_and_extract(
         sys.stdout.flush()
         return cached_path
 
-    dataset_tar_path = _download_file(radar_id, client)
-    metadata = client.get_dataset_metadata(radar_id)
-    verify_tar_checksum(dataset_tar_path, metadata)
+    dataset_tar_path = _download_file(identifier, client, download_url=download_url)
+    if verify_checksum:
+        metadata = client.get_dataset_metadata(radar_id)
+        verify_tar_checksum(dataset_tar_path, metadata)
     return _safe_extract_tar_with_progress(dataset_tar_path, radar_id)

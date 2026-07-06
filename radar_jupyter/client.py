@@ -1,7 +1,7 @@
 import re
 from enum import Enum
 from os import getenv
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 import requests
 
@@ -15,6 +15,10 @@ class RadarMetadataType(Enum):
 DOWNLOAD_DIR = getenv("RADAR_DOWNLOAD_DIR", "downloads")
 EXTRACTION_DIR = getenv("RADAR_EXTRACTION_DIR", "extracted")
 RADAR_API_URL = getenv("RADAR_API_URL", "https://www.radar-service.eu/radar")
+DOI_RESOLVER_URL = getenv("DOI_RESOLVER_URL", "https://doi.org")
+
+# Hosts whose downloads can be checksum-verified via the RADAR metadata API.
+_VERIFIABLE_DOWNLOAD_HOSTS = ("radar-service.eu", "radar.kit.edu")
 
 
 _RADAR_ID_PATTERN = re.compile(r"^RADAR/(.+)$", re.IGNORECASE)
@@ -58,6 +62,62 @@ def resolve_dataset_id(identifier: str) -> str:
         return m.group(2)
 
     return identifier
+
+
+def is_doi(identifier: str) -> bool:
+    """
+    Return ``True`` if the identifier is a DOI or DOI URL.
+
+    :param identifier: An identifier in any supported format.
+    :return: Whether the identifier is a DOI (bare, ``doi:`` prefixed, or a URL).
+    """
+    return bool(_DOI_PATTERN.match(identifier.strip()))
+
+
+def resolve_doi_download_url(identifier: str, timeout: float = 30) -> str:
+    """
+    Resolve the dataset TAR download URL for a DOI via its HTTP ``Link`` headers.
+
+    Sends an HTTP HEAD request to the DOI (following redirects) and looks for a
+    ``Link`` header with ``rel="item"``. The target URL of that link is the
+    location of the downloadable TAR archive.
+
+    :param identifier: A DOI or DOI URL.
+    :param timeout: Request timeout in seconds.
+    :return: The URL of the ``rel="item"`` link.
+    :raises ValueError: If the identifier is not a DOI, or if the DOI exposes no
+        ``Link`` header with ``rel="item"`` (i.e. it cannot be used with this script).
+    """
+    m = _DOI_PATTERN.match(identifier.strip())
+    if not m:
+        raise ValueError(f"Not a DOI: {identifier!r}")
+
+    doi_url = f"{DOI_RESOLVER_URL.rstrip('/')}/{m.group(1)}"
+    response = requests.head(doi_url, allow_redirects=True, timeout=timeout)
+    response.raise_for_status()
+
+    item = response.links.get("item")
+    if not item or not item.get("url"):
+        raise ValueError(
+            f"DOI {identifier!r} cannot be used with this script: "
+            'no Link header with rel="item" was found.'
+        )
+    return item["url"]
+
+
+def is_verifiable_download_host(url: str) -> bool:
+    """
+    Return ``True`` if a download URL points at a host whose files can be
+    checksum-verified via the RADAR metadata API.
+
+    :param url: The download URL to inspect.
+    :return: Whether the URL's host is (a subdomain of) a known RADAR host.
+    """
+    host = (urlparse(url).hostname or "").lower()
+    return any(
+        host == known or host.endswith(f".{known}")
+        for known in _VERIFIABLE_DOWNLOAD_HOSTS
+    )
 
 
 def _get_metadata_export_url(

@@ -8,6 +8,16 @@ dependencies = [
     "requests>=2.34.2",
 ]
 
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["radar_jupyter*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "network: tests that perform live HTTP requests (deselect with '-m \"not network\"')",
+]

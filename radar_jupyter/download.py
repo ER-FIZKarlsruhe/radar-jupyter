@@ -19,17 +19,20 @@ def _download_file(
     client: RadarApiClient,
     chunk_size: int = 1024 * 1024,
     timeout: Optional[float] = 30.0,
+    download_url: Optional[str] = None,
 ) -> Path:
     """
     Download a dataset TAR archive from RADAR, printing progress to stdout.
 
-    The download URL is resolved via the RADAR API, which handles redirects to
-    the actual storage location.
+    When ``download_url`` is given (e.g. a DOI ``rel="item"`` link) it is used
+    directly; otherwise the URL is resolved via the RADAR API, which handles
+    redirects to the actual storage location.
 
     :param identifier: Dataset ID, RADAR ID (``RADAR/<id>``), or DOI.
     :param client: A RadarApiClient instance.
     :param chunk_size: Number of bytes to read per chunk.
     :param timeout: Stream request timeout in seconds. Use None to disable.
+    :param download_url: Explicit download URL. If omitted, it is resolved via the API.
     :return: Path to the downloaded TAR file.
     """
     radar_id = resolve_dataset_id(identifier)
@@ -40,7 +43,7 @@ def _download_file(
         sys.stdout.flush()
         return existing
 
-    url = client.get_download_url(radar_id)
+    url = download_url if download_url is not None else client.get_download_url(radar_id)
     output_path = download_dir
 
     with requests.get(url, stream=True, timeout=timeout) as response:
